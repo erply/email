@@ -151,11 +151,11 @@ func NewEmailFromReader(r io.Reader) (*Email, error) {
 	if err != nil {
 		return e, err
 	}
-	for _, p := range ps {
+	for pIdx, p := range ps {
 		if ct := p.header.Get("Content-Type"); ct == "" {
 			return e, ErrMissingContentType
 		}
-		ct, _, err := mime.ParseMediaType(p.header.Get("Content-Type"))
+		ct, ctParams, err := mime.ParseMediaType(p.header.Get("Content-Type"))
 		if err != nil {
 			return e, err
 		}
@@ -173,6 +173,19 @@ func NewEmailFromReader(r io.Reader) (*Email, error) {
 				}
 				continue
 			}
+		} else if ct != "text/plain" && ct != "text/html" {
+			// This can also be an attachment without a Content-Disposition header. The Content-Type header can also
+			// contain the file name. If file name is provided in this manner, treat the mime as an attachment,
+			// otherwise show it inline
+			filename, filenameDefined := ctParams["name"]
+			if !filenameDefined {
+				filename = fmt.Sprintf("unnamed-attachment-%v", pIdx)
+			}
+			_, err = e.AttachWithHeaders(bytes.NewReader(p.body), filename, ct, p.header)
+			if err != nil {
+				return e, err
+			}
+			continue
 		}
 		switch {
 		case ct == "text/plain":
