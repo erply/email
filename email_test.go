@@ -91,7 +91,7 @@ func TestEmailWithHTMLAttachments(t *testing.T) {
 	}
 
 	// Print the bytes for ocular validation and make sure no errors.
-	//fmt.Println(string(b))
+	// fmt.Println(string(b))
 
 	// TODO: Verify the attachments.
 	s := &trimReader{rd: bytes.NewBuffer(b)}
@@ -157,7 +157,7 @@ func TestEmailWithHTMLAttachmentsHTMLOnly(t *testing.T) {
 	}
 
 	// Print the bytes for ocular validation and make sure no errors.
-	//fmt.Println(string(b))
+	// fmt.Println(string(b))
 
 	// TODO: Verify the attachments.
 	s := &trimReader{rd: bytes.NewBuffer(b)}
@@ -660,6 +660,10 @@ func TestAttachmentEmailFromReader(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error attaching inline image %s", err.Error())
 	}
+	c, err := ex.Attach(bytes.NewReader([]byte("Let's just pretend this is raw JPEG data.")), "image001.png", "image/png")
+	if err != nil {
+		t.Fatalf("Error attaching image without content-disposition %s", err.Error())
+	}
 	raw := []byte(`
 From: Jordan Wright <jmwright798@gmail.com>
 Date: Thu, 17 Oct 2019 08:55:37 +0100
@@ -685,6 +689,14 @@ Content-Type: text/html; charset=UTF-8
 <div dir=3D"ltr">Simple HTML body</div>
 
 --b10ca5b1072908cceb667e8968d3af04503b7ab07d61c9f579c15b416d7c--
+
+--35d10c2224bd787fe700c2c6f4769ddc936eb8a0b58e9c8717e406c5abb7
+Content-Type: image/png;
+        name="image001.png"
+Content-Id: <image001.content-id>
+Content-Transfer-Encoding: base64
+
+TGV0J3MganVzdCBwcmV0ZW5kIHRoaXMgaXMgcmF3IEpQRUcgZGF0YS4=
 
 --35d10c2224bd787fe700c2c6f4769ddc936eb8a0b58e9c8717e406c5abb7
 Content-Disposition: attachment;
@@ -721,29 +733,40 @@ TGV0J3MganVzdCBwcmV0ZW5kIHRoaXMgaXMgcmF3IEpQRUcgZGF0YS4=
 	if e.From != ex.From {
 		t.Fatalf("Incorrect \"From\": %#q != %#q", e.From, ex.From)
 	}
-	if len(e.Attachments) != 2 {
+	if len(e.Attachments) != 3 {
 		t.Fatalf("Incorrect number of attachments %d != %d", len(e.Attachments), 1)
 	}
-	if e.Attachments[0].Filename != a.Filename {
-		t.Fatalf("Incorrect attachment filename %s != %s", e.Attachments[0].Filename, a.Filename)
+	if e.Attachments[0].Filename != c.Filename {
+		t.Fatalf("Incorrect attachment filename %s != %s", e.Attachments[0].Filename, c.Filename)
 	}
 	if !bytes.Equal(e.Attachments[0].Content, a.Content) {
-		t.Fatalf("Incorrect attachment content %#q != %#q", e.Attachments[0].Content, a.Content)
+		t.Fatalf("Incorrect attachment content %#q != %#q", e.Attachments[0].Content, c.Content)
 	}
 	if e.Attachments[0].Header != nil {
-		if e.Attachments[0].Header.Get("Content-Id") != "<cat.content-id>" {
-			t.Fatalf("Incorrect attachment header Content-Id %s != %s", e.Attachments[0].Header.Get("Content-Id"), "<cat.content-id>")
+		if e.Attachments[0].Header.Get("Content-Id") != "<image001.content-id>" {
+			t.Fatalf("Incorrect attachment header Content-Id %s != %s", e.Attachments[0].Header.Get("Content-Id"), "<image001.content-id>")
 		}
 	}
-	if e.Attachments[1].Filename != b.Filename {
-		t.Fatalf("Incorrect attachment filename %s != %s", e.Attachments[1].Filename, b.Filename)
+	if e.Attachments[1].Filename != a.Filename {
+		t.Fatalf("Incorrect attachment filename %s != %s", e.Attachments[1].Filename, a.Filename)
 	}
-	if !bytes.Equal(e.Attachments[1].Content, b.Content) {
-		t.Fatalf("Incorrect attachment content %#q != %#q", e.Attachments[1].Content, b.Content)
+	if !bytes.Equal(e.Attachments[1].Content, a.Content) {
+		t.Fatalf("Incorrect attachment content %#q != %#q", e.Attachments[1].Content, a.Content)
 	}
 	if e.Attachments[1].Header != nil {
-		if e.Attachments[1].Header.Get("Content-Id") != "<cat-inline.content-id>" {
-			t.Fatalf("Incorrect attachment header Content-Id %s != %s", e.Attachments[1].Header.Get("Content-Id"), "<cat-inline.content-id>")
+		if e.Attachments[1].Header.Get("Content-Id") != "<cat.content-id>" {
+			t.Fatalf("Incorrect attachment header Content-Id %s != %s", e.Attachments[1].Header.Get("Content-Id"), "<cat.content-id>")
+		}
+	}
+	if e.Attachments[2].Filename != b.Filename {
+		t.Fatalf("Incorrect attachment filename %s != %s", e.Attachments[2].Filename, b.Filename)
+	}
+	if !bytes.Equal(e.Attachments[2].Content, b.Content) {
+		t.Fatalf("Incorrect attachment content %#q != %#q", e.Attachments[2].Content, b.Content)
+	}
+	if e.Attachments[2].Header != nil {
+		if e.Attachments[2].Header.Get("Content-Id") != "<cat-inline.content-id>" {
+			t.Fatalf("Incorrect attachment header Content-Id %s != %s", e.Attachments[2].Header.Get("Content-Id"), "<cat-inline.content-id>")
 		}
 	}
 }
