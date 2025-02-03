@@ -20,8 +20,6 @@ _cgo_export.*
 _testmain.go
 
 *.exe
-go.mod
-go.sum
 
 # IDEs
 .idea
