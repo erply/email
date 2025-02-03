@@ -540,8 +540,10 @@ From: Mrs =?ISO-8859-1?Q?Val=C3=A9rie=20Dupont?= <valerie.dupont@example.com>
 To: =?utf-8?q?Ana=C3=AFs?= <anais@example.org>
 Reply-To: =?utf-8?q?Ana=C3=AFs?= <anais@example.org>
 Cc: =?ISO-8859-1?Q?Patrik_F=E4ltstr=F6m?= <paf@example.com>
-Content-type: text/plain; charset=ISO-8859-1
+Content-Type: text/plain; charset=iso-8859-2
+Content-Transfer-Encoding: quoted-printable
 
+=E9=E4
 This is a test message!`)
 	e, err := NewEmailFromReader(bytes.NewReader(raw))
 	if err != nil {
@@ -561,6 +563,11 @@ This is a test message!`)
 	}
 	if e.Cc[0] != ex.Cc[0] {
 		t.Fatalf("Incorrect \"Cc\": %#q != %#q", e.Cc, ex.Cc)
+	}
+	textEx := `éä
+This is a test message!`
+	if string(e.Text) != textEx {
+		t.Fatalf("Incorrect \"Body\": %#q != %#q", string(e.Text), textEx)
 	}
 }
 

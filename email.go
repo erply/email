@@ -10,6 +10,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"golang.org/x/net/html/charset"
 	"io"
 	"math"
 	"math/big"
@@ -187,6 +188,25 @@ func NewEmailFromReader(r io.Reader) (*Email, error) {
 			}
 			continue
 		}
+
+		// For text parts, perform charset conversion if necessary. Default to "utf-8" if no charset is specified.
+		charsetLabel := "utf-8"
+		if cs, ok := ctParams["charset"]; ok {
+			charsetLabel = strings.ToLower(cs) // Normalize charset name for comparison
+		}
+		if charsetLabel != "utf-8" {
+			// Use charset.NewReaderLabel to convert from the declared charset to UTF-8.
+			r, err := charset.NewReaderLabel(charsetLabel, bytes.NewReader(p.body))
+			if err != nil {
+				return e, fmt.Errorf("failed to convert charset %q: %w", charsetLabel, err)
+			}
+			converted, err := io.ReadAll(r)
+			if err != nil {
+				return e, fmt.Errorf("failed to read converted content: %w", err)
+			}
+			p.body = converted
+		}
+
 		switch {
 		case ct == "text/plain":
 			e.Text = p.body
