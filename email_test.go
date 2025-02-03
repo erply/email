@@ -1,13 +1,10 @@
 package email
 
 import (
-	"fmt"
-	"strings"
-	"testing"
-
 	"bufio"
 	"bytes"
 	"crypto/rand"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"mime"
@@ -16,6 +13,8 @@ import (
 	"net/mail"
 	"net/smtp"
 	"net/textproto"
+	"strings"
+	"testing"
 )
 
 func prepareEmail() *Email {
