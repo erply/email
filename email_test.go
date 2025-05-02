@@ -523,6 +523,56 @@ d-printable decoding.</div>
 	}
 }
 
+func TestMultipleSameMimeFromReader(t *testing.T) {
+	ex := &Email{
+		Subject: "Test Subject",
+		To:      []string{"Jordan Wright <jmwright798@gmail.com>"},
+		From:    "Jordan Wright <jmwright798@gmail.com>",
+		Text:    []byte("This is a test email with HTML Formatting. It also has very long lines so\nthat the content must be wrapped if using quoted-printable decoding.\n"),
+	}
+	raw := []byte(`
+	MIME-Version: 1.0
+Subject: Test Subject
+From: Jordan Wright <jmwright798@gmail.com>
+To: Jordan Wright <jmwright798@gmail.com>
+Content-Type: multipart/alternative; boundary=001a114fb3fc42fd6b051f834280
+
+--001a114fb3fc42fd6b051f834280
+Content-Type: text/plain; charset=UTF-8
+
+This is a test email with HTML Formatting. It also has very long lines so
+that the content must be wrapped if using quoted-printable decoding.
+
+--001a114fb3fc42fd6b051f834280
+Content-Transfer-Encoding: 7bit
+Content-Type: text/plain;
+	charset=us-ascii
+
+This is second text-plain content-type imitating Apple-Mail legacy compatibility
+functionality that adds the same body also in us-ascii after utf-8 version
+
+--001a114fb3fc42fd6b051f834280--`)
+	e, err := NewEmailFromReader(bytes.NewReader(raw))
+	if err != nil {
+		t.Fatalf("Error creating email %s", err.Error())
+	}
+	if e.Subject != ex.Subject {
+		t.Fatalf("Incorrect subject. %#q != %#q", e.Subject, ex.Subject)
+	}
+	if !bytes.Equal(e.Text, ex.Text) {
+		t.Fatalf("Incorrect text: %#q != %#q", e.Text, ex.Text)
+	}
+	if e.From != ex.From {
+		t.Fatalf("Incorrect \"From\": %#q != %#q", e.From, ex.From)
+	}
+	if len(e.To) != len(ex.To) {
+		t.Fatalf("Incorrect number of \"To\" addresses: %v != %v", len(e.To), len(ex.To))
+	}
+	if e.To[0] != ex.To[0] {
+		t.Fatalf("Incorrect \"To[0]\": %#q != %#q", e.To[0], ex.To[0])
+	}
+}
+
 func TestNonAsciiEmailFromReader(t *testing.T) {
 	ex := &Email{
 		Subject: "Test Subject",
@@ -883,6 +933,48 @@ Testing!
 	}
 	if !bytes.Equal(e.Text, []byte("Testing!")) {
 		t.Fatalf("Error incorrect text: %#q != %#q\n", e.Text, "Testing!")
+	}
+}
+
+func TestOnlySignedContentType(t *testing.T) {
+	raw := []byte(`From: Mikhail Gusarov <dottedmag@dottedmag.net>
+To: notmuch@notmuchmail.org
+References: <20091117190054.GU3165@dottiness.seas.harvard.edu>
+Date: Wed, 18 Nov 2009 01:02:38 +0600
+Message-ID: <87iqd9rn3l.fsf@vertex.dottedmag>
+MIME-Version: 1.0
+Subject: Re: [notmuch] Working with Maildir storage?
+Content-Type: multipart/mixed; boundary="===============1958295626=="
+
+--===============1958295626==
+Content-Type: multipart/signed; boundary="=-=-=";
+    micalg=pgp-sha1; protocol="application/pgp-signature"
+
+--=-=-=
+Content-Transfer-Encoding: quoted-printable
+
+Twas brillig at 14:00:54 17.11.2009 UTC-05 when lars@seas.harvard.edu did g=
+yre and gimble:
+
+--=-=-=
+Content-Type: application/pgp-signature
+
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.9 (GNU/Linux)
+
+iQIcBAEBAgAGBQJLAvNOAAoJEJ0g9lA+M4iIjLYQAKp0PXEgl3JMOEBisH52AsIK
+=/ksP
+-----END PGP SIGNATURE-----
+--=-=-=--
+
+--===============1958295626==--
+`)
+	e, err := NewEmailFromReader(bytes.NewReader(raw))
+	if err != nil {
+		t.Fatalf("Error when parsing email %s", err.Error())
+	}
+	if !bytes.Equal(e.Text, []byte("Twas brillig at 14:00:54 17.11.2009 UTC-05 when lars@seas.harvard.edu did gyre and gimble:\n")) {
+		t.Fatalf("Error incorrect text: %#q != %#q\n", e.Text, "Twas brillig at 14:00:54 17.11.2009 UTC-05 when lars@seas.harvard.edu did gyre and gimble:\n")
 	}
 }
 

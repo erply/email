@@ -56,8 +56,10 @@ type Email struct {
 
 // part is a copyable representation of a multipart.Part
 type part struct {
-	header textproto.MIMEHeader
-	body   []byte
+	header    textproto.MIMEHeader
+	body      []byte
+	signature []byte // raw detached signature (only for signed)
+	isSigned  bool   // true if this part came from multipart/signed
 }
 
 // NewEmail creates an Email, and returns the pointer to it.
@@ -152,6 +154,7 @@ func NewEmailFromReader(r io.Reader) (*Email, error) {
 	if err != nil {
 		return e, err
 	}
+	var signedBody []byte // temp buffer for signed content
 	for pIdx, p := range ps {
 		if ct := p.header.Get("Content-Type"); ct == "" {
 			return e, ErrMissingContentType
@@ -160,6 +163,29 @@ func NewEmailFromReader(r io.Reader) (*Email, error) {
 		if err != nil {
 			return e, err
 		}
+
+		// capture signed content into signedBody, but do not assign immediately
+		if p.isSigned {
+			// charset conversion
+			charsetLabel := "utf-8"
+			if x, ok := ctParams["charset"]; ok {
+				charsetLabel = strings.ToLower(x)
+			}
+			content := p.body
+			if charsetLabel != "utf-8" {
+				rc, err := charset.NewReaderLabel(charsetLabel, bytes.NewReader(p.body))
+				if err != nil {
+					return e, fmt.Errorf("failed to convert signed content charset %q: %w", charsetLabel, err)
+				}
+				content, err = io.ReadAll(rc)
+				if err != nil {
+					return e, fmt.Errorf("failed to read signed content: %w", err)
+				}
+			}
+			signedBody = content
+			continue
+		}
+
 		// Check if part is an attachment based on the existence of the Content-Disposition header with a value of "attachment".
 		if cd := p.header.Get("Content-Disposition"); cd != "" {
 			cd, params, err := mime.ParseMediaType(p.header.Get("Content-Disposition"))
@@ -208,12 +234,18 @@ func NewEmailFromReader(r io.Reader) (*Email, error) {
 		}
 
 		switch {
-		case ct == "text/plain":
+		case ct == "text/plain" && len(e.Text) == 0:
 			e.Text = p.body
 		case ct == "text/html":
 			e.HTML = p.body
 		}
 	}
+
+	// fallback: if no Text/HTML but we saw signedBody, use it
+	if len(e.Text) == 0 && len(e.HTML) == 0 && len(signedBody) > 0 {
+		e.Text = signedBody
+	}
+
 	return e, nil
 }
 
@@ -231,7 +263,40 @@ func parseMIMEParts(hs textproto.MIMEHeader, b io.Reader) ([]*part, error) {
 	if err != nil {
 		return ps, err
 	}
-	// If it's a multipart email, recursively parse the parts
+	// Special-case signed parts
+	if ct == "multipart/signed" {
+		mr := multipart.NewReader(b, params["boundary"])
+		// Part1: signed data
+		p1, err := mr.NextPart()
+		if err != nil {
+			return ps, err
+		}
+		// Ensure default Content-Type if missing on signed data part
+		if _, ok := p1.Header["Content-Type"]; !ok {
+			p1.Header.Set("Content-Type", defaultContentType)
+		}
+		var buf1 bytes.Buffer
+		if _, err := io.Copy(&buf1, p1); err != nil {
+			return ps, err
+		}
+		// Part2: signature
+		p2, err := mr.NextPart()
+		if err != nil {
+			return ps, err
+		}
+		var buf2 bytes.Buffer
+		if _, err := io.Copy(&buf2, p2); err != nil {
+			return ps, err
+		}
+		ps = append(ps, &part{
+			body:      buf1.Bytes(),
+			header:    p1.Header,
+			signature: buf2.Bytes(),
+			isSigned:  true,
+		})
+		return ps, nil
+	}
+	// Otherwise recursively parse the parts
 	if strings.HasPrefix(ct, "multipart/") {
 		if _, ok := params["boundary"]; !ok {
 			return ps, ErrMissingBoundary
