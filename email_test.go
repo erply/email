@@ -528,7 +528,8 @@ func TestMultipleSameMimeFromReader(t *testing.T) {
 		Subject: "Test Subject",
 		To:      []string{"Jordan Wright <jmwright798@gmail.com>"},
 		From:    "Jordan Wright <jmwright798@gmail.com>",
-		Text:    []byte("This is a test email with HTML Formatting. It also has very long lines so\nthat the content must be wrapped if using quoted-printable decoding.\n"),
+		Text:    []byte("A.1: This is UTF-8 text/plain body\n"),
+		HTML:    []byte("B.1: This is first text/html body\n"),
 	}
 	raw := []byte(`
 	MIME-Version: 1.0
@@ -540,16 +541,35 @@ Content-Type: multipart/alternative; boundary=001a114fb3fc42fd6b051f834280
 --001a114fb3fc42fd6b051f834280
 Content-Type: text/plain; charset=UTF-8
 
-This is a test email with HTML Formatting. It also has very long lines so
-that the content must be wrapped if using quoted-printable decoding.
+A.1: This is UTF-8 text/plain body
 
 --001a114fb3fc42fd6b051f834280
 Content-Transfer-Encoding: 7bit
 Content-Type: text/plain;
 	charset=us-ascii
 
-This is second text-plain content-type imitating Apple-Mail legacy compatibility
-functionality that adds the same body also in us-ascii after utf-8 version
+A.2: This is fallback text/plain body
+
+--001a114fb3fc42fd6b051f834280
+Content-Type: multipart/mixed;
+	boundary="Apple-Mail=_2D67308F-5DF4-4EE4-BD05-2A7BC99B92F1"
+
+
+--Apple-Mail=_2D67308F-5DF4-4EE4-BD05-2A7BC99B92F1
+Content-Transfer-Encoding: quoted-printable
+Content-Type: text/html;
+	charset=utf-8
+
+B.1: This is first text/html body
+
+--Apple-Mail=_2D67308F-5DF4-4EE4-BD05-2A7BC99B92F1
+Content-Transfer-Encoding: quoted-printable
+Content-Type: text/html;
+	charset=utf-8
+
+B.2: This is second text/html body
+
+--Apple-Mail=_2D67308F-5DF4-4EE4-BD05-2A7BC99B92F1--
 
 --001a114fb3fc42fd6b051f834280--`)
 	e, err := NewEmailFromReader(bytes.NewReader(raw))
@@ -561,6 +581,9 @@ functionality that adds the same body also in us-ascii after utf-8 version
 	}
 	if !bytes.Equal(e.Text, ex.Text) {
 		t.Fatalf("Incorrect text: %#q != %#q", e.Text, ex.Text)
+	}
+	if !bytes.Equal(e.HTML, ex.HTML) {
+		t.Fatalf("Incorrect HTML: %#q != %#q", e.HTML, ex.HTML)
 	}
 	if e.From != ex.From {
 		t.Fatalf("Incorrect \"From\": %#q != %#q", e.From, ex.From)
