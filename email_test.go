@@ -850,7 +850,7 @@ TGV0J3MganVzdCBwcmV0ZW5kIHRoaXMgaXMgcmF3IEpQRUcgZGF0YS4=
 	}
 }
 
-func ExampleGmail() {
+func ExampleNewEmail_gmail() {
 	e := NewEmail()
 	e.From = "Jordan Wright <test@gmail.com>"
 	e.To = []string{"test@example.com"}
@@ -859,12 +859,12 @@ func ExampleGmail() {
 	e.Subject = "Awesome Subject"
 	e.Text = []byte("Text Body is, of course, supported!\n")
 	e.HTML = []byte("<h1>Fancy Html is supported, too!</h1>\n")
-	e.Send("smtp.gmail.com:587", smtp.PlainAuth("", e.From, "password123", "smtp.gmail.com"))
+	_ = e.Send("smtp.gmail.com:587", smtp.PlainAuth("", e.From, "password123", "smtp.gmail.com"))
 }
 
-func ExampleAttach() {
+func ExampleEmail_AttachFile() {
 	e := NewEmail()
-	e.AttachFile("test.txt")
+	_, _ = e.AttachFile("test.txt")
 }
 
 func Test_base64Wrap(t *testing.T) {
