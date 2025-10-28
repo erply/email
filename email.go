@@ -236,7 +236,7 @@ func NewEmailFromReader(r io.Reader) (*Email, error) {
 		switch {
 		case ct == "text/plain" && len(e.Text) == 0:
 			e.Text = p.body
-		case ct == "text/html":
+		case ct == "text/html" && len(e.HTML) == 0:
 			e.HTML = p.body
 		}
 	}
